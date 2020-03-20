@@ -35,6 +35,7 @@ DISTDIR="$SPARK_HOME/dist"
 MAKE_TGZ=false
 MAKE_PIP=false
 MAKE_R=false
+INCL_EXAMPLES=true
 NAME=none
 MVN="$SPARK_HOME/build/mvn"
 
@@ -68,6 +69,9 @@ while (( "$#" )); do
     --name)
       NAME="$2"
       shift
+      ;;
+    --exclude-examples)
+      INCL_EXAMPLES=false
       ;;
     --help)
       exit_with_usage
@@ -195,21 +199,29 @@ if [ -d "$SPARK_HOME"/resource-managers/kubernetes/core/target/ ]; then
   cp -a "$SPARK_HOME"/resource-managers/kubernetes/integration-tests/tests "$DISTDIR/kubernetes/"
 fi
 
-# Copy examples and dependencies
-mkdir -p "$DISTDIR/examples/jars"
-cp "$SPARK_HOME"/examples/target/scala*/jars/* "$DISTDIR/examples/jars"
+if [ "$INCL_EXAMPLES" == "true" ]; then
 
-# Deduplicate jars that have already been packaged as part of the main Spark dependencies.
-for f in "$DISTDIR"/examples/jars/*; do
-  name=$(basename "$f")
-  if [ -f "$DISTDIR/jars/$name" ]; then
-    rm "$DISTDIR/examples/jars/$name"
-  fi
-done
+  # Copy examples and dependencies
+  mkdir -p "$DISTDIR/examples/jars"
+  cp "$SPARK_HOME"/examples/target/scala*/jars/* "$DISTDIR/examples/jars"
 
-# Copy example sources (needed for python and SQL)
-mkdir -p "$DISTDIR/examples/src/main"
-cp -r "$SPARK_HOME/examples/src/main" "$DISTDIR/examples/src/"
+  # Deduplicate jars that have already been packaged as part of the main Spark dependencies.
+  for f in "$DISTDIR"/examples/jars/*; do
+    name=$(basename "$f")
+    if [ -f "$DISTDIR/jars/$name" ]; then
+      rm "$DISTDIR/examples/jars/$name"
+    fi
+  done
+
+  # Copy example sources (needed for python and SQL)
+  mkdir -p "$DISTDIR/examples/src/main"
+  cp -r "$SPARK_HOME/examples/src/main" "$DISTDIR/examples/src/"
+
+  # Copy data files
+  cp -r "$SPARK_HOME/data" "$DISTDIR"
+else
+  echo "Skipping examples and data directories"
+fi
 
 # Copy license and ASF files
 if [ -e "$SPARK_HOME/LICENSE-binary" ]; then
@@ -223,9 +235,6 @@ fi
 if [ -e "$SPARK_HOME/CHANGES.txt" ]; then
   cp "$SPARK_HOME/CHANGES.txt" "$DISTDIR"
 fi
-
-# Copy data files
-cp -r "$SPARK_HOME/data" "$DISTDIR"
 
 # Make pip package
 if [ "$MAKE_PIP" == "true" ]; then
